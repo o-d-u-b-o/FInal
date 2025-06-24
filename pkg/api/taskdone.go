@@ -26,21 +26,18 @@ func taskDoneHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Получаем текущую задачу
 	task, err := db.GetTask(id)
 	if err != nil {
-		writeJSON(w, ErrorResponse{Error: err.Error()}, http.StatusNotFound)
+		writeJSON(w, ErrorResponse{Error: "task not found"}, http.StatusNotFound)
 		return
 	}
 
 	if task.Repeat == "" {
-		// Удаляем одноразовую задачу
 		if err := db.DeleteTask(id); err != nil {
 			writeJSON(w, ErrorResponse{Error: err.Error()}, http.StatusInternalServerError)
 			return
 		}
 	} else {
-		// Обновляем дату для периодической задачи
 		now := time.Now()
 		nextDateStr, err := NextDate(now, task.Date, task.Repeat)
 		if err != nil {
@@ -48,7 +45,13 @@ func taskDoneHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if err := db.UpdateTaskDate(id, nextDateStr); err != nil {
+		if err := db.UpdateTask(&db.Task{
+			ID:      id,
+			Date:    nextDateStr,
+			Title:   task.Title,
+			Comment: task.Comment,
+			Repeat:  task.Repeat,
+		}); err != nil {
 			writeJSON(w, ErrorResponse{Error: err.Error()}, http.StatusInternalServerError)
 			return
 		}

@@ -37,20 +37,18 @@ func handleGetTask(w http.ResponseWriter, r *http.Request) {
 
 	task, err := db.GetTask(id)
 	if err != nil {
-		writeJSON(w, ErrorResponse{Error: err.Error()}, http.StatusNotFound)
+		writeJSON(w, ErrorResponse{Error: "task not found"}, http.StatusNotFound)
 		return
 	}
 
-	// Формируем ответ в формате, ожидаемом тестом
-	response := map[string]string{
-		"id":      idStr, // Используем строковый ID
+	// Исправлено: возвращаем ID как строку
+	writeJSON(w, map[string]interface{}{
+		"id":      strconv.FormatInt(task.ID, 10),
 		"date":    task.Date,
 		"title":   task.Title,
 		"comment": task.Comment,
 		"repeat":  task.Repeat,
-	}
-
-	writeJSON(w, response, http.StatusOK)
+	}, http.StatusOK)
 }
 
 func handleUpdateTask(w http.ResponseWriter, r *http.Request) {
@@ -65,6 +63,14 @@ func handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		writeJSON(w, ErrorResponse{Error: "Invalid JSON format"}, http.StatusBadRequest)
 		return
+	}
+
+	// Валидация правила повторения
+	if request.Repeat != "" {
+		if err := validateRepeatRule(request.Repeat); err != nil {
+			writeJSON(w, ErrorResponse{Error: err.Error()}, http.StatusBadRequest)
+			return
+		}
 	}
 
 	if request.ID == "" {
@@ -83,7 +89,6 @@ func handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Обработка даты
 	if request.Date == "" {
 		request.Date = time.Now().Format("20060102")
 	} else {
@@ -109,7 +114,6 @@ func handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, struct{}{}, http.StatusOK)
 }
 
-// Добавляем новый обработчик для удаления задач
 func handleDeleteTask(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Query().Get("id")
 	if idStr == "" {

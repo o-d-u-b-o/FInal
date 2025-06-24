@@ -68,7 +68,7 @@ func handleDailyRule(now, date time.Time, parts []string) (string, error) {
 
 	for {
 		date = date.AddDate(0, 0, days)
-		if date.After(now) {
+		if dateAfter(date, now) {
 			break
 		}
 	}
@@ -79,7 +79,7 @@ func handleDailyRule(now, date time.Time, parts []string) (string, error) {
 func handleYearlyRule(now, date time.Time) string {
 	for {
 		date = date.AddDate(1, 0, 0)
-		if date.After(now) {
+		if dateAfter(date, now) {
 			break
 		}
 	}
@@ -102,7 +102,7 @@ func handleWeeklyRule(now, date time.Time, parts []string) (string, error) {
 
 	for {
 		date = date.AddDate(0, 0, 1)
-		if date.After(now) {
+		if dateAfter(date, now) {
 			weekday := int(date.Weekday())
 			if weekday == 0 {
 				weekday = 7
@@ -164,7 +164,7 @@ func handleMonthlyRule(now, date time.Time, parts []string) (string, error) {
 	nextDate := date
 	for {
 		nextDate = nextDate.AddDate(0, 0, 1)
-		if nextDate.After(now) {
+		if dateAfter(nextDate, now) {
 			currentMonth := int(nextDate.Month())
 			currentDay := nextDate.Day()
 
@@ -206,4 +206,8 @@ func isLastDayOfMonth(date time.Time) bool {
 
 func isPenultimateDayOfMonth(date time.Time) bool {
 	return date.AddDate(0, 0, 2).Month() != date.Month()
+}
+
+func dateAfter(t1, t2 time.Time) bool {
+	return t1.Format(dateFormat) > t2.Format(dateFormat)
 }

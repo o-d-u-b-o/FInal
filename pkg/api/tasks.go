@@ -3,9 +3,9 @@ package api
 import (
 	"go1f/pkg/db"
 	"net/http"
+	"strconv"
 )
 
-// Изменяем структуру ответа
 type TaskResponse struct {
 	ID      int64  `json:"id"`
 	Date    string `json:"date"`
@@ -31,17 +31,17 @@ func getTaskListHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Преобразуем задачи в нужный формат ответа
-	taskResponses := make([]TaskResponse, len(tasks))
+	// Исправленный формат ответа
+	taskResponses := make([]map[string]string, len(tasks))
 	for i, task := range tasks {
-		taskResponses[i] = TaskResponse{
-			ID:      task.ID,
-			Date:    task.Date,
-			Title:   task.Title,
-			Comment: task.Comment,
-			Repeat:  task.Repeat,
+		taskResponses[i] = map[string]string{
+			"id":      strconv.FormatInt(task.ID, 10),
+			"date":    task.Date,
+			"title":   task.Title,
+			"comment": task.Comment,
+			"repeat":  task.Repeat,
 		}
 	}
 
-	writeJSON(w, TasksResponse{Tasks: taskResponses}, http.StatusOK)
+	writeJSON(w, map[string]interface{}{"tasks": taskResponses}, http.StatusOK)
 }

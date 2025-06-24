@@ -2,8 +2,7 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
-	"log"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,24 +12,12 @@ import (
 )
 
 type taskResponse struct {
-	ID    string `json:"id,omitempty"`
+	ID    string `json:"id"`
 	Error string `json:"error,omitempty"`
 }
 
 func addTaskHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("AddTask request: Method=%s, Path=%s", r.Method, r.URL.Path)
-
-	if r.Method == http.MethodOptions {
-		log.Println("Handling OPTIONS request")
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
 	if r.Method != http.MethodPost {
-		log.Printf("Invalid method: %s, expected POST", r.Method)
 		writeJSON(w, taskResponse{Error: "Method not allowed"}, http.StatusMethodNotAllowed)
 		return
 	}
@@ -39,70 +26,86 @@ func addTaskHandler(w http.ResponseWriter, r *http.Request) {
 	var response taskResponse
 
 	if err := json.NewDecoder(r.Body).Decode(&task); err != nil {
-		log.Printf("JSON decode error: %v", err)
 		response.Error = "Invalid JSON format"
 		writeJSON(w, response, http.StatusBadRequest)
 		return
 	}
 
 	if task.Title == "" {
-		log.Println("Empty title")
 		response.Error = "Task title is required"
 		writeJSON(w, response, http.StatusBadRequest)
 		return
 	}
 
+	// Валидация правила повторения
+	if task.Repeat != "" {
+		if err := validateRepeatRule(task.Repeat); err != nil {
+			response.Error = err.Error()
+			writeJSON(w, response, http.StatusBadRequest)
+			return
+		}
+	}
+
 	now := time.Now()
-	if err := processTaskDate(&task, now); err != nil {
-		log.Printf("Date processing error: %v", err)
-		response.Error = err.Error()
-		writeJSON(w, response, http.StatusBadRequest)
-		return
+	if task.Date == "" {
+		task.Date = now.Format("20060102")
+	} else {
+		if _, err := time.Parse("20060102", task.Date); err != nil {
+			response.Error = "Invalid date format, expected YYYYMMDD"
+			writeJSON(w, response, http.StatusBadRequest)
+			return
+		}
+	}
+
+	// Проверка что дата не в прошлом
+	date, _ := time.Parse("20060102", task.Date)
+	if date.Before(now) && task.Repeat == "" {
+		task.Date = now.Format("20060102")
 	}
 
 	id, err := db.AddTask(&task)
 	if err != nil {
-		log.Printf("Database error: %v", err)
 		response.Error = "Failed to add task to database"
 		writeJSON(w, response, http.StatusInternalServerError)
 		return
 	}
 
-	log.Printf("Task added successfully, ID: %d", id)
 	response.ID = strconv.FormatInt(id, 10)
 	writeJSON(w, response, http.StatusOK)
 }
 
-func processTaskDate(task *db.Task, now time.Time) error {
-	// Обрабатываем специальное значение "today" и тестовый случай "20250622"
-	if strings.EqualFold(task.Date, "today") || task.Date == "20250622" {
-		task.Date = now.Format(dateFormat)
+func validateRepeatRule(repeat string) error {
+	parts := strings.Fields(repeat)
+	if len(parts) == 0 {
 		return nil
 	}
 
-	// Если дата не указана - используем сегодня
-	if task.Date == "" {
-		task.Date = now.Format(dateFormat)
-		return nil
-	}
-
-	// Парсим дату
-	date, err := time.Parse(dateFormat, task.Date)
-	if err != nil {
-		return fmt.Errorf("invalid date format, expected YYYYMMDD")
-	}
-
-	// Если дата в прошлом и есть правило повторения
-	if date.Before(now) && task.Repeat != "" {
-		next, err := NextDate(now, task.Date, task.Repeat)
-		if err != nil {
-			return err
+	switch parts[0] {
+	case "d":
+		if len(parts) != 2 {
+			return errors.New("invalid daily repeat format")
 		}
-		task.Date = next
-	} else if date.Before(now) {
-		// Если дата в прошлом и нет правила повторения - используем сегодня
-		task.Date = now.Format(dateFormat)
+		if _, err := strconv.Atoi(parts[1]); err != nil {
+			return errors.New("invalid days count")
+		}
+	case "w":
+		if len(parts) != 2 {
+			return errors.New("invalid weekly repeat format")
+		}
+		for _, day := range strings.Split(parts[1], ",") {
+			if _, err := strconv.Atoi(day); err != nil || day < "1" || day > "7" {
+				return errors.New("invalid weekday")
+			}
+		}
+	case "m":
+		if len(parts) < 2 {
+			return errors.New("invalid monthly repeat format")
+		}
+		// Дополнительная валидация для monthly
+	case "y":
+		// Ничего не нужно для yearly
+	default:
+		return errors.New("unsupported repeat rule")
 	}
-
 	return nil
 }
