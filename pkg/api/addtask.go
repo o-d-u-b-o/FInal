@@ -59,8 +59,20 @@ func addTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Проверка что дата не в прошлом
 	date, _ := time.Parse("20060102", task.Date)
-	if date.Before(now) && task.Repeat == "" {
-		task.Date = now.Format("20060102")
+	if Before(date, now) {
+		if task.Repeat == "" {
+			// Для неповторяющихся задач - установить сегодняшнюю дату
+			task.Date = now.Format("20060102")
+		} else {
+			// Для повторяющихся задач - вычислить следующую валидную дату
+			nextDate, err := NextDate(now, task.Date, task.Repeat)
+			if err != nil {
+				response.Error = err.Error()
+				writeJSON(w, response, http.StatusBadRequest)
+				return
+			}
+			task.Date = nextDate
+		}
 	}
 
 	id, err := db.AddTask(&task)
@@ -103,7 +115,7 @@ func validateRepeatRule(repeat string) error {
 		}
 		// Дополнительная валидация для monthly
 	case "y":
-		// Ничего не нужно для yearly
+
 	default:
 		return errors.New("unsupported repeat rule")
 	}

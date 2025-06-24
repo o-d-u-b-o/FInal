@@ -6,6 +6,10 @@ import (
 	"time"
 )
 
+func Before(time1, time2 time.Time) bool {
+	return time1.Format(dateFormat) < time2.Format(dateFormat)
+}
+
 func Init() {
 	corsHandler := func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {

@@ -6,18 +6,6 @@ import (
 	"strconv"
 )
 
-type TaskResponse struct {
-	ID      int64  `json:"id"`
-	Date    string `json:"date"`
-	Title   string `json:"title"`
-	Comment string `json:"comment"`
-	Repeat  string `json:"repeat"`
-}
-
-type TasksResponse struct {
-	Tasks []TaskResponse `json:"tasks"`
-}
-
 func getTaskListHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeJSON(w, ErrorResponse{Error: "Method not allowed"}, http.StatusMethodNotAllowed)
@@ -31,7 +19,6 @@ func getTaskListHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Исправленный формат ответа
 	taskResponses := make([]map[string]string, len(tasks))
 	for i, task := range tasks {
 		taskResponses[i] = map[string]string{
