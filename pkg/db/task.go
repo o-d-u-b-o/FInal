@@ -3,7 +3,6 @@ package db
 import (
 	"database/sql"
 	"fmt"
-	"strings"
 	"time"
 )
 
@@ -35,12 +34,12 @@ func Tasks(limit int, search string) ([]*Task, error) {
 		args = []interface{}{date, limit}
 
 	case search != "":
-		searchTerm := "%" + strings.ToLower(search) + "%"
-		query = `SELECT id, date, title, comment, repeat 
-		         FROM scheduler 
-		         WHERE LOWER(title) LIKE ? OR LOWER(comment) LIKE ? 
-		         ORDER BY date ASC 
-		         LIMIT ?`
+		searchTerm := "%" + search + "%"
+		query = `SELECT id, date, title, comment, repeat
+             FROM scheduler
+             WHERE title LIKE ? OR comment LIKE ?
+             ORDER BY date ASC
+             LIMIT ?`
 		args = []interface{}{searchTerm, searchTerm, limit}
 
 	default:
